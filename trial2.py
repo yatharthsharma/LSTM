@@ -1,6 +1,7 @@
 import tensorflow as tf
 from tensorflow.contrib.rnn import LSTMCell
 from tensorflow.python.ops.rnn_cell import  LSTMStateTuple
+from util import init_weight, get_ptb_data, display_tree
 
 tf.reset_default_graph() #Clears the default graph stack and resets the global default graph.
 sess = tf.InteractiveSession() #initializes a tensorflow session
@@ -110,7 +111,7 @@ def toWords(input, reverseLookUp):
             wordSequence.append('.')
     return wordSequence
 
-datasetPath = "trees/data1.txt"
+datasetPath = "trees/treeSentences.txt"
 lookUp, reverseLookUp = getLookUps(datasetPath)
 
 sentences=getSentences(datasetPath,lookUp)
@@ -135,9 +136,9 @@ W2 = tf.Variable(tf.random_uniform([dime, dime], -1, 1), dtype=tf.float32)
 
 # you will get the sentence embedding - modified yatharths
 def SentenceEmbedding(tree):
-    if tree.value is not None:
+    if tree.word is not None:
         # this is a leaf node
-        x = tf.nn.embedding_lookup(embeddings, [tree.value])
+        x = tf.nn.embedding_lookup(embeddings, [tree.word])
 
     else:
         # this node has children
@@ -149,11 +150,13 @@ def SentenceEmbedding(tree):
     return x
 
 #preparing the full input for decoder( we are not providing encoder final state as c,h. we are provding it as input(xs) to decoder)
-def PrepareInput(sentence) :
+def PrepareInput(sentence,tree_sent) :
     k=len(sentence)
-    treeof=create(sentence)
-
-    tup=SentenceEmbedding(treeof)
+    # treeof=create(sentence)
+    print("-----------------------------")
+    print(sentence)
+    print(tree_sent)
+    tup=SentenceEmbedding(tree_sent)
     tup=tup.eval()
     fullinput=[]
     for i in range(k):
@@ -203,7 +206,7 @@ def batchfun(inputs, max_sequence_length=None):
     # [batch_size, max_time] -> [max_time, batch_size]
     inputs_time_major = inputs_batch_major.swapaxes(0, 1)
 
-    return inputs_time_major, sequence_lengths
+    return inputs_time_major, max_sequence_length
 
 """
 def PrepareOutput(sentence):
@@ -304,16 +307,20 @@ def next_feed(start):
     ronaldo, q = batchfun(batch)
     #print(ronaldo)
     tenin = []
-    for k in ronaldo:
+    train, test, word2idx = get_ptb_data()
+    # print(len(np.transpose(ronaldo)))
+
+    for k in range(0,len(np.transpose(ronaldo))):
         #k=PrepareInput(k))
-        tenin.append(PrepareInput(k))
+        # print(k)
+        tenin.append(PrepareInput(ronaldo[k],train[k]))
     #print(tf.shape(tenin))
     # we need to reshape this properly
     # [ batch size, sequence lenght,wordvec size
     #tenin.eval()
     #print(tenin)
     #decoder_inputs_ = tf.reshape(tenin, [10, 12, dime])
-    tenin=np.reshape(tenin,(12,10,200))
+    tenin=np.reshape(tenin,(encoder_input_lengths_,batch_size,200))
     decoder_inputs_= tenin
 
     # this part causes the problem
